@@ -14,6 +14,7 @@
 	STATE_SIZE DB 16												;rozmiar stanu w bajtach
 	MATRIX_DIMENSION DB 4											;dlugosc i szerokosc macierzy przemnazanych w ramach mieszania kolumn
 	MIX_MATRIX DB 2, 3, 1, 1, 1, 2, 3, 1, 1, 1, 2, 3, 3, 1, 1, 2	;macierz wspolczynnikow mieszania macierzy
+	MIX_COLUMNS_OUTPUT DB 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0			;tablica wyjsciowa operacji mix_columns									;
 	PARTIAL_ONE DB 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 	PARTIAL_TWO DB 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 	PARTIAL_THREE DB 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
@@ -75,6 +76,8 @@
 		cmp r9b, 10
 		je last_round
 
+		push r8
+		push r9
 		xor r12, r12								;zerowanie rejestru danych
 		xor r13, r13								
 		xor r15, r15								
@@ -83,7 +86,8 @@
 		xorps xmm1, xmm1
 		xorps xmm2, xmm2
 
-		mov rbx, OFFSET MIX_MATRIX					;zapis adresu tablicy pomocniczej do rax
+		mov rax, OFFSET MIX_COLUMNS_OUTPUT			;zapis adresu tablicy wynikowej dla mix_columns
+		mov rbx, OFFSET MIX_MATRIX					;zapis adresu tablicy wspolczynnikow
 
 	mix_columns_outer:
 		cmp r10b, MATRIX_DIMENSION					;sprawdzenie warunku stopu
@@ -91,33 +95,44 @@
 		xor r11, r11								;zerowanie iteratora zagniezdzonej petli
 
 	mix_columns_inner:
+		xor r8, r8
+		xor r9, r9
 		mov r15b, r10b								;obliczenie indeksu tablic pomocniczych
 		sal r15b, 2
 		add r15b, r11b
-
-		mov rax, OFFSET PARTIAL_ONE					;zapis adresu tablicy pomocniczej do rax
+		
+		;mov rax, OFFSET PARTIAL_ONE
 		mov r12b, BYTE PTR [rcx + r11]				;pobranie bajtu ze stanu
 		mov r13b, BYTE PTR [rbx + r10 * 4]			;pobranie wspolczynnika z macierzy
 		call multiply_bytes
-		mov BYTE PTR [rax + r15], r12b				;zaladowanie wyniku czesciowego do tablicy pomocniczej
+		xor r9b, r12b
+		;mov BYTE PTR [rax + r15], r12b				;zaladowanie wyniku czesciowego do tablicy pomocniczej
 
-		mov rax, OFFSET PARTIAL_TWO
+		;mov rax, OFFSET PARTIAL_TWO
 		mov r12b, BYTE PTR [rcx + r11 + 4]
 		mov r13b, BYTE PTR [rbx + r10 * 4 + 1]
 		call multiply_bytes
-		mov BYTE PTR [rax + r15], r12b
+		xor r9b, r12b
+		;mov BYTE PTR [rax + r15], r12b
 	
-		mov rax, OFFSET PARTIAL_THREE
+		;mov rax, OFFSET PARTIAL_THREE
 		mov r12b, BYTE PTR [rcx + r11 + 8]
 		mov r13b, BYTE PTR [rbx + r10 * 4 + 2]
 		call multiply_bytes
-		mov BYTE PTR [rax + r15], r12b
+		xor r9b, r12b
+		;mov BYTE PTR [rax + r15], r12b
 	
-		mov rax, OFFSET PARTIAL_FOUR
+		;mov rax, OFFSET PARTIAL_FOUR
 		mov r12b, BYTE PTR [rcx + r11 + 12]
 		mov r13b, BYTE PTR [rbx + r10 * 4 + 3]
 		call multiply_bytes
-		mov BYTE PTR [rax + r15], r12b
+		xor r9b, r12b
+		;mov BYTE PTR [rax + r15], r12b
+
+		mov r8, r10
+		sal r8, 2
+		add r8, r11
+		mov BYTE PTR [rax + r8], r9b
 
 		inc r11
 		cmp r11b, MATRIX_DIMENSION
@@ -159,18 +174,23 @@
 		ret
 
 	mix_columns_finish:
-		mov rax, OFFSET PARTIAL_ONE
-		movdqu xmm1, [rax]
-		mov rax, OFFSET PARTIAL_TWO
-		movdqu xmm2, [rax]
-		mov rax, OFFSET PARTIAL_THREE
-		movdqu xmm3, [rax]
-		mov rax, OFFSET PARTIAL_FOUR
-		movdqu xmm4, [rax]
+		;mov rax, OFFSET PARTIAL_ONE
+		;movdqu xmm1, [rax]
+		;mov rax, OFFSET PARTIAL_TWO
+		;movdqu xmm2, [rax]
+		;mov rax, OFFSET PARTIAL_THREE
+		;movdqu xmm3, [rax]
+		;mov rax, OFFSET PARTIAL_FOUR
+		;movdqu xmm4, [rax]
 
-		xorps xmm1, xmm2
-		xorps xmm1, xmm3
-		xorps xmm1, xmm4
+		;xorps xmm1, xmm2
+		;xorps xmm1, xmm3
+		;xorps xmm1, xmm4
+
+		pop r9
+		pop r8
+
+		movdqu xmm1, [rax]
 		jmp add_round_key
 	
 	last_round:

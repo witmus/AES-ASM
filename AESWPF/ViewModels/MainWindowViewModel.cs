@@ -175,10 +175,10 @@ namespace AESWPF.ViewModels
             }
 
             var end = DateTime.Now;
+            var executionTime = (end - start).TotalMilliseconds;
             foreach(var block in threadBlocks)
                 result = result.Concat(block).ToArray();
 
-            var executionTime = (end - start).TotalMilliseconds;
             MilisecondsSum += executionTime;
             TimeResult = executionTime.ToString();
             return result;

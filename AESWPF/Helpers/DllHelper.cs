@@ -5,13 +5,13 @@ namespace AESWPF.Helpers
 {
     public static class AsmDllHelper
     {
-        [DllImport(@"C:\Users\witek\source\repos\AESWPF\x64\Release\AESasm.dll")]
+        [DllImport(@".\AESasm.dll")]
         public static extern void Aes(byte[] input, byte[] key, byte[] sbox, int round);
     }
 
     public static class CppDllHelper
     {
-        [DllImport(@"C:\Users\witek\source\repos\AESWPF\x64\Release\AEScpp.dll")]
+        [DllImport(@".\AEScpp.dll")]
         public static extern void Aes(byte[] input, byte[] key, byte[] sbox, int round);
     }
 
