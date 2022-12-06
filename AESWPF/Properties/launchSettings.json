@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "AESWPF": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}
