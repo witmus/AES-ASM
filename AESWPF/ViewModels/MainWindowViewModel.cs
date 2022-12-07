@@ -119,11 +119,11 @@ namespace AESWPF.ViewModels
                 input = input.Concat(padded).ToArray();
             }
 
-            keys = TransposeRoundKeys(keys);
+            var keysArray = TransposeRoundKeys(keys);
 
             var aes = DllHelper.Aes(SelectedLibrary);
 
-            var cipheredBytes = CipherBytes(input, keys, aes);
+            var cipheredBytes = CipherBytes(input, keysArray, aes);
             var cipheredBase64String = Convert.ToBase64String(cipheredBytes);
 
             var resultPathBin = @"./secretBinaryMessage.bin";
@@ -138,7 +138,7 @@ namespace AESWPF.ViewModels
             return !string.IsNullOrWhiteSpace(InputFilePath) && KeyValue?.Length == 16;
         }
 
-        private byte[] CipherBytes(byte[] bytes, byte[][] keys, Action<byte[], byte[], byte[], int> aes)
+        private byte[] CipherBytes(byte[] bytes, byte[] keys, Action<byte[], byte[], byte[]> aes)
         {
             var result = Array.Empty<byte>();
 
@@ -184,14 +184,14 @@ namespace AESWPF.ViewModels
             return result;
         }
 
-        private Thread StartThread(byte[] input, byte[][] keys, Action<byte[], byte[], byte[], int> aes)
+        private Thread StartThread(byte[] input, byte[] keys, Action<byte[], byte[], byte[]> aes)
         {
             var thread = new Thread(() => CipherBlock(input, keys, aes));
             thread.Start();
             return thread;
         }
 
-        private static void CipherBlock(byte[] input, byte[][] keys, Action<byte[], byte[], byte[], int> aes)
+        private static void CipherBlock(byte[] input, byte[] keys, Action<byte[], byte[], byte[]> aes)
         {
             byte[] state;
             for (int i = 0; i < input.Length; i += 16)
@@ -199,13 +199,10 @@ namespace AESWPF.ViewModels
                 state = input[i..(i + 16)];
                 state = TransposeFourByFour(state);
 
-                AesCSharp.ApplyRoundKey(state, keys[0]);
-
-                for (short l = 1; l <= 10; l++)
-                {
-                    aes(state, keys[l], SBox.SBoxBytes, l);
-                }
-
+                AesCSharp.ApplyRoundKey(state, keys[0..16]);
+                
+                aes(state, keys, SBox.SBoxBytes);
+                
                 state = TransposeFourByFour(state);
 
                 for (int k = 0; k < 16; k++)
@@ -215,13 +212,13 @@ namespace AESWPF.ViewModels
             }
         }
 
-        private static byte[][] TransposeRoundKeys(byte[][] keys)
+        private static byte[] TransposeRoundKeys(byte[][] keys)
         {
-            var result = new byte[11][];
+            var result = Array.Empty<byte>();
 
             for(int i = 0; i < 11; i++)
             {
-                result[i] = TransposeFourByFour(keys[i]);
+                result = result.Concat(TransposeFourByFour(keys[i])).ToArray();
             }
 
             return result;

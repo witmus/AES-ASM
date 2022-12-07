@@ -4,21 +4,15 @@
 ; state - rcx
 ; key - rdx
 ; sbox - r8
-; round - r9
+; roundIterator - r9
 ; iterator - r10
 ; additional iterator - r11
 ; processedRow/processedByte - r12d/r12b
 ; processedByte - r13b
 
 .data
-	STATE_SIZE DB 16												;rozmiar stanu w bajtach
-	MATRIX_DIMENSION DB 4											;dlugosc i szerokosc macierzy przemnazanych w ramach mieszania kolumn
 	MIX_MATRIX DB 2, 3, 1, 1, 1, 2, 3, 1, 1, 1, 2, 3, 3, 1, 1, 2	;macierz wspolczynnikow mieszania macierzy
-	MIX_COLUMNS_OUTPUT DB 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0			;tablica wyjsciowa operacji mix_columns									;
-	PARTIAL_ONE DB 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	PARTIAL_TWO DB 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	PARTIAL_THREE DB 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	PARTIAL_FOUR DB 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+	MIX_COLUMNS_OUTPUT DB 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0			;tablica wyjsciowa operacji mix_columns
 
 .code
 	Aes proc
@@ -31,6 +25,11 @@
 		push r13
 		push r14
 		push r15
+
+		xor r9, r9
+		mov r9b, 1
+
+	start_round:
 													;zerowanie uzywanych rejestrow
 		xor rax, rax
 		xor rbx, rbx
@@ -42,18 +41,17 @@
 		xor r10, r10
 		xor r12, r12
 		xor r13, r13
+		xor r14, r14
+		xor r15, r15
 
 		mov r11b, 16								;zapis rozmiaru stanu w bajtach do rejestru r11b
-
-		movdqu xmm1, [rcx]							;DEBUG wczytanie stanu
-		movdqu xmm2, [rdx]							;DEBUG wczytanie klucza rundy
 
 	sub_bytes:
 		mov r12b, BYTE PTR [rcx + r10]				;wczytanie pierwszego bajtu stanu
 		mov r12b, BYTE PTR [r8 + r12]				;podstawienie wartosci z tablicy sbox
 		mov BYTE PTR [rcx + r10], r12b				;zapis podstawionej wartosci do stanu
 		inc r10										;inkrementacja iteratora
-		cmp r10b, STATE_SIZE						;sprawdzenie warunku stopu
+		cmp r10b, 16								;sprawdzenie warunku stopu
 		jl sub_bytes								;jesli nie ostatni bajt stanu wykonaj sub_bytes dla kolejnego bajtu
 
 		xor r10, r10								;zerowanie iteratora
@@ -90,7 +88,7 @@
 		mov rbx, OFFSET MIX_MATRIX					;zapis adresu tablicy wspolczynnikow
 
 	mix_columns_outer:
-		cmp r10b, MATRIX_DIMENSION					;sprawdzenie warunku stopu
+		cmp r10b, 4					;sprawdzenie warunku stopu
 		je mix_columns_finish						;jesli ostatni wiersz macierzy wspolczynnikow skoncz mieszanie kolumn
 		xor r11, r11								;zerowanie iteratora zagniezdzonej petli
 
@@ -101,33 +99,25 @@
 		sal r15b, 2
 		add r15b, r11b
 		
-		;mov rax, OFFSET PARTIAL_ONE
 		mov r12b, BYTE PTR [rcx + r11]				;pobranie bajtu ze stanu
 		mov r13b, BYTE PTR [rbx + r10 * 4]			;pobranie wspolczynnika z macierzy
 		call multiply_bytes
 		xor r9b, r12b
-		;mov BYTE PTR [rax + r15], r12b				;zaladowanie wyniku czesciowego do tablicy pomocniczej
 
-		;mov rax, OFFSET PARTIAL_TWO
 		mov r12b, BYTE PTR [rcx + r11 + 4]
 		mov r13b, BYTE PTR [rbx + r10 * 4 + 1]
 		call multiply_bytes
 		xor r9b, r12b
-		;mov BYTE PTR [rax + r15], r12b
 	
-		;mov rax, OFFSET PARTIAL_THREE
 		mov r12b, BYTE PTR [rcx + r11 + 8]
 		mov r13b, BYTE PTR [rbx + r10 * 4 + 2]
 		call multiply_bytes
 		xor r9b, r12b
-		;mov BYTE PTR [rax + r15], r12b
 	
-		;mov rax, OFFSET PARTIAL_FOUR
 		mov r12b, BYTE PTR [rcx + r11 + 12]
 		mov r13b, BYTE PTR [rbx + r10 * 4 + 3]
 		call multiply_bytes
 		xor r9b, r12b
-		;mov BYTE PTR [rax + r15], r12b
 
 		mov r8, r10
 		sal r8, 2
@@ -135,7 +125,7 @@
 		mov BYTE PTR [rax + r8], r9b
 
 		inc r11
-		cmp r11b, MATRIX_DIMENSION
+		cmp r11b, 4
 		je mix_columns_inner_finish
 		jmp mix_columns_inner
 
@@ -174,19 +164,6 @@
 		ret
 
 	mix_columns_finish:
-		;mov rax, OFFSET PARTIAL_ONE
-		;movdqu xmm1, [rax]
-		;mov rax, OFFSET PARTIAL_TWO
-		;movdqu xmm2, [rax]
-		;mov rax, OFFSET PARTIAL_THREE
-		;movdqu xmm3, [rax]
-		;mov rax, OFFSET PARTIAL_FOUR
-		;movdqu xmm4, [rax]
-
-		;xorps xmm1, xmm2
-		;xorps xmm1, xmm3
-		;xorps xmm1, xmm4
-
 		pop r9
 		pop r8
 
@@ -197,10 +174,18 @@
 		movdqu xmm1, [rcx]
 
 	add_round_key:
-		movdqu xmm0, [rdx]
+		sal r9, 4
+		movdqu xmm0, [rdx + r9]
+		sar r9, 4
 		xorps xmm1, xmm0
 		movdqu XMMWORD PTR [rcx], xmm1
 
+		inc r9
+		cmp r9, 11
+		jl start_round
+		
+
+	finish:
 		pop r15
 		pop r14
 		pop r13

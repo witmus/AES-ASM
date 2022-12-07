@@ -6,7 +6,7 @@
 #define CPPLIB_API __declspec(dllimport)
 #endif
 
-extern "C" CPPLIB_API void Aes(unsigned char* state, unsigned char* key, unsigned char* sbox, short round);
+extern "C" CPPLIB_API void Aes(unsigned char* state, unsigned char* keys, unsigned char* sbox);
 
 void SubBytes(unsigned char* state, unsigned char* sbox);
 
@@ -20,4 +20,4 @@ unsigned char MultiplyByTwo(unsigned char a);
 
 unsigned char MultiplyByThree(unsigned char a);
 
-void ApplyRoundKey(unsigned char* state, unsigned char* key);
+void ApplyRoundKey(unsigned char* state, unsigned char* key, int round);

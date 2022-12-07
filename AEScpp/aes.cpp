@@ -2,16 +2,19 @@
 #include "pch.h"
 #include "aes.h"
 
-void Aes(unsigned char * state, unsigned char * key, unsigned char * sbox, short round)
+void Aes(unsigned char * state, unsigned char * keys, unsigned char * sbox)
 {
-    SubBytes(state, sbox);
+    for (int i = 1; i <= 10; i++)
+    {
+        SubBytes(state, sbox);
 
-    ShiftRows(state);
+        ShiftRows(state);
 
-    if(round < 10)
-        MixColumns(state);
+        if(i < 10)
+            MixColumns(state);
     
-    ApplyRoundKey(state, key);
+        ApplyRoundKey(state, keys, i);
+    }
 }
 
 void SubBytes(unsigned char* state, unsigned char* sbox)
@@ -116,13 +119,13 @@ unsigned char MultiplyByThree(unsigned char a)
     return MultiplyByTwo(a) ^ a;
 }
 
-void ApplyRoundKey(unsigned char* state, unsigned char* key)
+void ApplyRoundKey(unsigned char* state, unsigned char* keys, int round)
 {
     for (int i = 0; i < 4; i++)
     {
         for (int j = 0; j < 4; j++)
         {
-            state[i + j * 4] ^= key[i + j * 4];
+            state[i + j * 4] ^= keys[16 * round + i + j * 4];
         }
     }
 }
