@@ -56,9 +56,8 @@
 
 		xor r10, r10								;zerowanie iteratora
 
-		movdqu xmm1, [rcx]							;DEBUG wczytanie stanu
-
 	shift_rows:
+
 		mov r12d, DWORD PTR [rcx + 4]				;wczytanie drugiego wiersza stanu (zgodnie z algorytmem pierwszy wiersz nie jest przesuwany)
 		ror r12d, 8									;obrot wiersza
 		mov DWORD PTR [rcx + 4], r12d				;zapis obroconego wiersza do stanu
@@ -74,48 +73,42 @@
 		cmp r9b, 10
 		je last_round
 
-		push r8
-		push r9
+		push r8										;przechowanie wskaznika na sbox na stosie
+		push r9										;przechowanie iteratora rundy na stosie
+		
 		xor r12, r12								;zerowanie rejestru danych
-		xor r13, r13								
-		xor r15, r15								
-		xor rbx, rbx								
-		xor rax, rax
-		xorps xmm1, xmm1
-		xorps xmm2, xmm2
 
 		mov rax, OFFSET MIX_COLUMNS_OUTPUT			;zapis adresu tablicy wynikowej dla mix_columns
 		mov rbx, OFFSET MIX_MATRIX					;zapis adresu tablicy wspolczynnikow
 
 	mix_columns_outer:
-		cmp r10b, 4					;sprawdzenie warunku stopu
+		cmp r10b, 4									;sprawdzenie warunku stopu
 		je mix_columns_finish						;jesli ostatni wiersz macierzy wspolczynnikow skoncz mieszanie kolumn
 		xor r11, r11								;zerowanie iteratora zagniezdzonej petli
+		mov r15d, DWORD PTR [rbx + r10 * 4]			;wczytanie wiersza macierzy wspolczynnikow
 
 	mix_columns_inner:
 		xor r8, r8
 		xor r9, r9
-		mov r15b, r10b								;obliczenie indeksu tablic pomocniczych
-		sal r15b, 2
-		add r15b, r11b
-		
+
+		mov r13d, r15d								;skopiowanie wspolczynnikow
+
 		mov r12b, BYTE PTR [rcx + r11]				;pobranie bajtu ze stanu
-		mov r13b, BYTE PTR [rbx + r10 * 4]			;pobranie wspolczynnika z macierzy
-		call multiply_bytes
-		xor r9b, r12b
+		call multiply_bytes							;wywolanie procedury mnozenia bajtow
+		xor r9b, r12b								;dodanie czesciowego wyniku do rejestru wyjsciowego
+		shr r13d, 8
 
 		mov r12b, BYTE PTR [rcx + r11 + 4]
-		mov r13b, BYTE PTR [rbx + r10 * 4 + 1]
 		call multiply_bytes
 		xor r9b, r12b
+		shr r13d, 8
 	
 		mov r12b, BYTE PTR [rcx + r11 + 8]
-		mov r13b, BYTE PTR [rbx + r10 * 4 + 2]
 		call multiply_bytes
 		xor r9b, r12b
+		shr r13d, 8
 	
 		mov r12b, BYTE PTR [rcx + r11 + 12]
-		mov r13b, BYTE PTR [rbx + r10 * 4 + 3]
 		call multiply_bytes
 		xor r9b, r12b
 
@@ -134,16 +127,14 @@
 		jmp mix_columns_outer
 
 	multiply_bytes:
-		cmp r13b, 2
+		cmp r13b, 2									;sprawdzenie wartosci wspolczynnika z macierzy stalych
 		jg multiply_by_three
 		je multiply_by_two
 		ret
 
 	multiply_by_two:
-		mov r14b, r12b
 		sal r12b, 1
-		cmp r14, 07Fh
-		jg mul_two_overflow
+		jc mul_two_overflow
 		ret
 
 	mul_two_overflow:
@@ -153,8 +144,7 @@
 	multiply_by_three:
 		mov r14b, r12b
 		sal r12b, 1
-		cmp r14, 07Fh
-		jg mul_three_overflow
+		jc mul_three_overflow
 		xor r12b, r14b
 		ret
 
@@ -166,7 +156,7 @@
 	mix_columns_finish:
 		pop r9
 		pop r8
-
+		
 		movdqu xmm1, [rax]
 		jmp add_round_key
 	
@@ -186,7 +176,7 @@
 		
 
 	finish:
-		pop r15
+		pop r15										;przywrocenie pierwotnych wartosci rejestrow
 		pop r14
 		pop r13
 		pop r12
