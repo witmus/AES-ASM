@@ -110,6 +110,8 @@ namespace AESWPF.ViewModels
         {
             var keys = KeyExpansionHelper.KeyExpansion(KeyValue);
 
+            var keysArray = TransposeRoundKeys(keys);
+
             var input = File.ReadAllBytes(InputFilePath);
 
             if (input.Length % 16 != 0)
@@ -118,8 +120,6 @@ namespace AESWPF.ViewModels
                 var padded = new byte[difference];
                 input = input.Concat(padded).ToArray();
             }
-
-            var keysArray = TransposeRoundKeys(keys);
 
             var aes = DllHelper.Aes(SelectedLibrary);
 
@@ -243,11 +243,28 @@ namespace AESWPF.ViewModels
 
         private void ExecuteBatchTesting(object param)
         {
+            var keys = KeyExpansionHelper.KeyExpansion(KeyValue);
+
+            var keysArray = TransposeRoundKeys(keys);
+
+            var input = File.ReadAllBytes(InputFilePath);
+
+            if (input.Length % 16 != 0)
+            {
+                var difference = 16 - input.Length % 16;
+                var padded = new byte[difference];
+                input = input.Concat(padded).ToArray();
+            }
+
+            var aes = DllHelper.Aes(SelectedLibrary);
+
             MilisecondsSum = 0;
+
             for(int i = 0; i < 100; i++)
             {
-                ExecuteCiphering(param);
+                var cipheredBytes = CipherBytes(input, keysArray, aes);
             }
+
             TimeResult = (MilisecondsSum / 100).ToString();
         }
 
