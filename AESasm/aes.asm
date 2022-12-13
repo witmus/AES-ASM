@@ -28,6 +28,7 @@
 
 		xor r9, r9
 		mov r9b, 1
+		mov r11b, 16								;zapis rozmiaru stanu w bajtach do rejestru r11b
 
 	start_round:
 													;zerowanie uzywanych rejestrow
@@ -35,16 +36,12 @@
 		xor rbx, rbx
 		xorps xmm0, xmm0
 		xorps xmm1, xmm1
-		xorps xmm2, xmm2
-		xorps xmm3, xmm3
-		xorps xmm4, xmm4
 		xor r10, r10
 		xor r12, r12
 		xor r13, r13
 		xor r14, r14
 		xor r15, r15
 
-		mov r11b, 16								;zapis rozmiaru stanu w bajtach do rejestru r11b
 
 	sub_bytes:
 		mov r12b, BYTE PTR [rcx + r10]				;wczytanie pierwszego bajtu stanu
@@ -62,11 +59,11 @@
 		ror r12d, 8									;obrot wiersza
 		mov DWORD PTR [rcx + 4], r12d				;zapis obroconego wiersza do stanu
 
-		mov r12d, DWORD PTR [rcx + 8]				
+		mov r12d, DWORD PTR [rcx + 8]				;wczytanie trzeciego wiersza stanu				
 		ror r12d, 16
 		mov DWORD PTR [rcx + 8], r12d
 
-		mov r12d, DWORD PTR [rcx + 12]				
+		mov r12d, DWORD PTR [rcx + 12]				;wczytanie czwartego wiersza stanu				
 		ror r12d, 24
 		mov DWORD PTR [rcx + 12], r12d
 
@@ -84,7 +81,7 @@
 	mix_columns_outer:
 		cmp r10b, 4									;sprawdzenie warunku stopu
 		je mix_columns_finish						;jesli ostatni wiersz macierzy wspolczynnikow skoncz mieszanie kolumn
-		xor r11, r11								;zerowanie iteratora zagniezdzonej petli
+		xor r11, r11								;zerowanie iteratora kolumny stanu
 		mov r15d, DWORD PTR [rbx + r10 * 4]			;wczytanie wiersza macierzy wspolczynnikow
 
 	mix_columns_inner:
@@ -111,11 +108,11 @@
 		mov r12b, BYTE PTR [rcx + r11 + 12]
 		call multiply_bytes
 		xor r9b, r12b
-
+													;obliczenie adresu bajtu wynikowego
 		mov r8, r10
-		sal r8, 2
-		add r8, r11
-		mov BYTE PTR [rax + r8], r9b
+		sal r8, 2									;przeniesienie indeksu wiersza i przemnozenie przez 4 
+		add r8, r11									;dodanie indeksu kolumny
+		mov BYTE PTR [rax + r8], r9b				;zapis obliczonego bajtu w tablicy wyjsciowej
 
 		inc r11
 		cmp r11b, 4
@@ -123,7 +120,7 @@
 		jmp mix_columns_inner
 
 	mix_columns_inner_finish:
-		inc r10
+		inc r10										;inkrementacja iteratora wiersza macierzy wspolczynnikow
 		jmp mix_columns_outer
 
 	multiply_bytes:
@@ -133,16 +130,16 @@
 		ret
 
 	multiply_by_two:
-		sal r12b, 1
-		jc mul_two_overflow
-		ret
+		sal r12b, 1									;przemnoz bajt przez 2
+		jc mul_two_overflow							;jesli nastapilo przeniesienie najstarszego bitu wykonaj dodatkowa operacje
+		ret											;powrot z procedury multiply_bytes
 
 	mul_two_overflow:
 		xor r12b, 01Bh
-		ret
+		ret											;powrot z procedury multiply_bytes
 
 	multiply_by_three:
-		mov r14b, r12b
+		mov r14b, r12b								;rozbicie mnozenia przez 3 na dwie osobne operacje
 		sal r12b, 1
 		jc mul_three_overflow
 		xor r12b, r14b
@@ -154,23 +151,23 @@
 		ret
 
 	mix_columns_finish:
-		pop r9
+		pop r9										;odzyskanie wartosci ze stosu
 		pop r8
 		
-		movdqu xmm1, [rax]
+		movdqu xmm1, [rax]							;wczytanie tablicy po mieszaniu kolumn
 		jmp add_round_key
 	
 	last_round:
-		movdqu xmm1, [rcx]
+		movdqu xmm1, [rcx]							;w ostatniej rundzie nie nastepuje mieszanie kolumn, aktualna wartosc stanu jest wskazywana przez rcx
 
 	add_round_key:
-		sal r9, 4
-		movdqu xmm0, [rdx + r9]
-		sar r9, 4
-		xorps xmm1, xmm0
-		movdqu XMMWORD PTR [rcx], xmm1
+		sal r9, 4							;klucz rundy ma 16 bajtow, wiec indeks pierwszego bajtu klucza rundy = iterator rund * 16
+		movdqu xmm0, [rdx + r9]				;wczytanie klucza rundy do xmm0
+		sar r9, 4							;przywrocenie pierwotnej wartosci iteratora rundy
+		xorps xmm1, xmm0					;dodanie klucza rundy do stanu
+		movdqu XMMWORD PTR [rcx], xmm1		;uaktualnienie wartosci stanu
 
-		inc r9
+		inc r9										;inkrementacja iteratora rund
 		cmp r9, 11
 		jl start_round
 		
@@ -181,7 +178,6 @@
 		pop r13
 		pop r12
 		pop rbx
-		pop rax
 
 		mov rsp, rbp								;epilog
 		pop rbp
